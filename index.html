@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Deary-Liewald Touch Task</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Touch & Selection Optimization */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Responsive Diamond Grid Layout */
+        .diamond-grid {
+            display: grid;
+            grid-template-columns: repeat(3, min(26vw, 130px));
+            grid-template-rows: repeat(3, min(26vw, 130px));
+            gap: max(12px, 2.5vw);
+            justify-content: center;
+            align-content: center;
+        }
+
+        .box-top    { grid-row: 1; grid-column: 2; background-color: #f1c40f; }
+        .box-left   { grid-row: 2; grid-column: 1; background-color: #2ecc71; }
+        .box-right  { grid-row: 2; grid-column: 3; background-color: #e74c3c; }
+        .box-bottom { grid-row: 3; grid-column: 2; background-color: #3498db; }
+
+        .target-box {
+            position: relative;
+            border-radius: 16px;
+            border: 3px solid #333333;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            transition: transform 0.08s ease, filter 0.08s ease, border-color 0.15s ease;
+        }
+
+        .target-box:active {
+            transform: scale(0.94);
+            filter: brightness(1.2);
+            border-color: #ffffff;
+        }
+
+        /* Black Circle Stimulus */
+        .stimulus {
+            width: 42%;
+            height: 42%;
+            background-color: #000000;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+            pointer-events: none;
+            animation: popIn 0.1s ease-out;
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-center items-center">
+
+    <!-- INSTRUCTION SCREEN -->
+    <div id="instruction-screen" class="flex flex-col items-center justify-center p-6 text-center max-w-lg w-full">
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-wide mb-6 text-white">DEARY-LIEWALD TASK</h1>
+        
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8 shadow-xl text-zinc-300 text-base sm:text-lg leading-relaxed text-left w-full space-y-4">
+            <p><strong class="text-white">GOAL:</strong><br>
+            Four colored boxes are arranged in a diamond shape.</p>
+            
+            <p><strong class="text-white">HOW TO PLAY:</strong><br>
+            Whenever a <span class="text-amber-400 font-semibold">BLACK CIRCLE</span> appears inside any box, tap that box as fast as possible!</p>
+            
+            <p class="text-sm text-zinc-400 border-t border-zinc-800 pt-3">
+                • 70 total trials<br>
+                • You have 1.25s to respond per trial
+            </p>
+        </div>
+
+        <button id="start-btn" class="w-full sm:w-auto px-10 py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-zinc-950 font-bold text-xl rounded-2xl shadow-lg transition transform active:scale-95">
+            START TASK
+        </button>
+    </div>
+
+    <!-- TASK SCREEN -->
+    <div id="task-screen" class="hidden flex-col items-center justify-between h-full w-full max-w-md py-8 px-4">
+        <!-- Top Status Bar -->
+        <div class="w-full flex justify-between items-center text-zinc-400 text-sm font-semibold px-2">
+            <span id="trial-counter" class="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg">Trial: 0 / 70</span>
+            <button id="quit-btn" class="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg hover:text-white active:bg-zinc-800">Quit</button>
+        </div>
+
+        <!-- Diamond Grid Layout -->
+        <div class="diamond-grid my-auto">
+            <div id="box-top" class="target-box box-top" data-index="0"></div>
+            <div id="box-left" class="target-box box-left" data-index="1"></div>
+            <div id="box-right" class="target-box box-right" data-index="2"></div>
+            <div id="box-bottom" class="target-box box-bottom" data-index="3"></div>
+        </div>
+
+        <!-- Feedback Display -->
+        <div class="h-12 flex items-center justify-center">
+            <span id="feedback-label" class="text-2xl font-black tracking-wider transition-opacity duration-150"></span>
+        </div>
+    </div>
+
+    <!-- RESULTS SCREEN -->
+    <div id="results-screen" class="hidden flex-col items-center justify-center p-6 text-center max-w-md w-full">
+        <h1 class="text-3xl font-extrabold tracking-wide mb-6 text-white">TASK COMPLETED</h1>
+
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8 shadow-xl w-full text-left space-y-6">
+            <h2 class="text-lg font-bold text-sky-400 uppercase tracking-wider border-b border-zinc-800 pb-2">Overall Performance</h2>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-zinc-950/60 p-4 rounded-xl border border-zinc-800">
+                    <span class="text-xs text-zinc-400 uppercase font-semibold block mb-1">Accuracy</span>
+                    <span id="res-accuracy" class="text-2xl sm:text-3xl font-black text-white">--</span>
+                </div>
+                <div class="bg-zinc-950/60 p-4 rounded-xl border border-zinc-800">
+                    <span class="text-xs text-zinc-400 uppercase font-semibold block mb-1">Avg Speed</span>
+                    <span id="res-rt" class="text-2xl sm:text-3xl font-black text-white">--</span>
+                </div>
+            </div>
+
+            <div id="res-summary-details" class="text-xs text-zinc-400 space-y-1"></div>
+        </div>
+
+        <button id="restart-btn" class="w-full sm:w-auto px-10 py-4 bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-zinc-950 font-bold text-xl rounded-2xl shadow-lg transition transform active:scale-95">
+            RESTART
+        </button>
+    </div>
+
+    <script>
+        // Task Parameters
+        const TOTAL_TRIALS = 70;
+        const TIME_LIMIT = 1250; // ms
+        const MIN_RSI = 500;     // ms
+        const MAX_RSI = 2500;    // ms
+
+        // App State
+        let running = false;
+        let waitingForInput = false;
+        let trialCount = 0;
+        let results = [];
+        let targetBoxIndex = null;
+        let startTime = 0;
+        let timeoutId = null;
+        let rsiTimeoutId = null;
+
+        // UI Elements
+        const screens = {
+            instruction: document.getElementById('instruction-screen'),
+            task: document.getElementById('task-screen'),
+            results: document.getElementById('results-screen')
+        };
+
+        const boxes = [
+            document.getElementById('box-top'),
+            document.getElementById('box-left'),
+            document.getElementById('box-right'),
+            document.getElementById('box-bottom')
+        ];
+
+        const feedbackLabel = document.getElementById('feedback-label');
+        const trialCounter = document.getElementById('trial-counter');
+        const resAccuracy = document.getElementById('res-accuracy');
+        const resRt = document.getElementById('res-rt');
+        const resSummaryDetails = document.getElementById('res-summary-details');
+
+        // Navigation & Control Buttons
+        document.getElementById('start-btn').addEventListener('click', startTask);
+        document.getElementById('restart-btn').addEventListener('click', showInstructionScreen);
+        document.getElementById('quit-btn').addEventListener('click', endTask);
+
+        // Optional Spacebar to start/restart
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                if (!screens.instruction.classList.contains('hidden')) {
+                    e.preventDefault();
+                    startTask();
+                } else if (!screens.results.classList.contains('hidden')) {
+                    e.preventDefault();
+                    showInstructionScreen();
+                }
+            }
+        });
+
+        // Touch Interaction setup for boxes
+        boxes.forEach(box => {
+            // Support both touch and click events safely
+            const handleResponse = (e) => {
+                e.preventDefault(); // Prevent double triggers or scrolling
+                const index = parseInt(box.getAttribute('data-index'), 10);
+                onBoxTap(index);
+            };
+
+            box.addEventListener('touchstart', handleResponse, { passive: false });
+            box.addEventListener('mousedown', (e) => {
+                // Ignore left click if simulated by touch
+                if (e.detail === 0) return; 
+                handleResponse(e);
+            });
+        });
+
+        function showScreen(screenName) {
+            Object.keys(screens).forEach(key => {
+                screens[key].classList.toggle('hidden', key !== screenName);
+                if (key === screenName) screens[key].classList.add('flex');
+            });
+        }
+
+        function showInstructionScreen() {
+            running = false;
+            clearAllTimers();
+            showScreen('instruction');
+        }
+
+        function startTask() {
+            running = true;
+            trialCount = 0;
+            results = [];
+            clearAllTimers();
+            showScreen('task');
+            prepareNextTrial();
+        }
+
+        function clearStimuli() {
+            boxes.forEach(box => {
+                const stimulus = box.querySelector('.stimulus');
+                if (stimulus) stimulus.remove();
+            });
+        }
+
+        function prepareNextTrial() {
+            if (!running) return;
+
+            if (trialCount >= TOTAL_TRIALS) {
+                endTask();
+                return;
+            }
+
+            waitingForInput = false;
+            feedbackLabel.textContent = '';
+            clearStimuli();
+            trialCounter.textContent = `Trial: ${trialCount + 1} / ${TOTAL_TRIALS}`;
+
+            // Random Inter-Stimulus Interval (RSI) between 500ms and 2500ms
+            const randomDelay = Math.floor(Math.random() * (MAX_RSI - MIN_RSI + 1)) + MIN_RSI;
+            rsiTimeoutId = setTimeout(nextTrial, randomDelay);
+        }
+
+        function nextTrial() {
+            if (!running) return;
+
+            // Pick a random box (0 to 3)
+            targetBoxIndex = Math.floor(Math.random() * 4);
+
+            // Spawn black circle stimulus
+            const stimulus = document.createElement('div');
+            stimulus.className = 'stimulus';
+            boxes[targetBoxIndex].appendChild(stimulus);
+
+            waitingForInput = true;
+            startTime = performance.now();
+
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(handleTimeout, TIME_LIMIT);
+        }
+
+        function onBoxTap(tappedIndex) {
+            if (!running || !waitingForInput) return;
+
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
+            waitingForInput = false;
+            const rt = (performance.now() - startTime) / 1000.0; // Reaction time in seconds
+            const isCorrect = (tappedIndex === targetBoxIndex);
+
+            recordAndFeedback(isCorrect, rt);
+        }
+
+        function handleTimeout() {
+            if (!running || !waitingForInput) return;
+
+            timeoutId = null;
+            waitingForInput = false;
+            recordAndFeedback(false, TIME_LIMIT / 1000.0, true);
+        }
+
+        function recordAndFeedback(isCorrect, rt, timedOut = false) {
+            results.push({
+                correct: isCorrect,
+                rt: rt,
+                timedOut: timedOut
+            });
+            trialCount++;
+
+            if (timedOut) {
+                feedbackLabel.textContent = "TOO SLOW";
+                feedbackLabel.className = "text-2xl font-black tracking-wider text-zinc-500";
+            } else if (isCorrect) {
+                feedbackLabel.textContent = "CORRECT";
+                feedbackLabel.className = "text-2xl font-black tracking-wider text-emerald-400";
+            } else {
+                feedbackLabel.textContent = "INCORRECT";
+                feedbackLabel.className = "text-2xl font-black tracking-wider text-orange-500";
+            }
+
+            // Short feedback pause before next trial
+            setTimeout(prepareNextTrial, 400);
+        }
+
+        function clearAllTimers() {
+            if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+            if (rsiTimeoutId) { clearTimeout(rsiTimeoutId); rsiTimeoutId = null; }
+        }
+
+        function endTask() {
+            running = false;
+            clearAllTimers();
+            clearStimuli();
+            showResultsScreen();
+        }
+
+        function showResultsScreen() {
+            showScreen('results');
+
+            let accuracy = 0.0;
+            let avgRtStr = "N/A";
+            const totalRun = results.length;
+
+            if (totalRun > 0) {
+                const correctTrials = results.filter(r => r.correct);
+                accuracy = (correctTrials.length / totalRun) * 100;
+
+                const correctRts = correctTrials.map(r => r.rt);
+                if (correctRts.length > 0) {
+                    const avgRt = correctRts.reduce((sum, val) => sum + val, 0) / correctRts.length;
+                    avgRtStr = `${avgRt.toFixed(3)}s`;
+                }
+
+                const timedOutCount = results.filter(r => r.timedOut).length;
+                resSummaryDetails.innerHTML = `
+                    Completed ${totalRun} of ${TOTAL_TRIALS} trials.<br>
+                    Correct: ${correctTrials.length} | Incorrect: ${totalRun - correctTrials.length - timedOutCount} | Too Slow: ${timedOutCount}
+                `;
+            } else {
+                resSummaryDetails.textContent = "No trials recorded.";
+            }
+
+            resAccuracy.textContent = `${accuracy.toFixed(1)}%`;
+            resRt.textContent = avgRtStr;
+        }
+    </script>
+</body>
+</html>
